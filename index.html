@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Sprint</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 400,
+            physics: { default: "arcade", arcade: { gravity: { y: 600 }, debug: false } },
+            scene: { preload, create, update }
+        };
+
+        let player, ground;
+        let cursors;
+
+        const game = new Phaser.Game(config);
+
+        function preload() {
+            this.load.image("ground", "assets/sprites/ground.png");
+            this.load.spritesheet("player", "assets/sprites/player.png", {
+                frameWidth: 32,
+                frameHeight: 32
+            });
+        }
+
+        function create() {
+            ground = this.physics.add.staticImage(400, 380, "ground").setScale(2).refreshBody();
+            player = this.physics.add.sprite(100, 300, "player").setScale(2);
+
+            player.setCollideWorldBounds(true);
+            this.physics.add.collider(player, ground);
+
+            // IDLE animation
+            this.anims.create({
+                key: "idle",
+                frames: this.anims.generateFrameNumbers("player", { start: 0, end: 4 }),
+                frameRate: 7,
+                repeat: -1
+            });
+
+            // RUN animation
+            this.anims.create({
+                key: "run",
+                frames: this.anims.generateFrameNumbers("player", { start: 5, end: 12 }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            // JUMP animation
+            this.anims.create({
+                key: "jump",
+                frames: this.anims.generateFrameNumbers("player", { start: 13, end: 16 }),
+                frameRate: 8,
+                repeat: 0
+            });
+
+            player.play("idle");
+
+            cursors = this.input.keyboard.createCursorKeys();
+        }
+
+        function update() {
+            let isOnGround = player.body.blocked.down;
+            let isMoving = cursors.left.isDown || cursors.right.isDown;
+
+            player.setVelocityX(0);
+
+            if (cursors.left.isDown) {
+                player.setVelocityX(-200);
+                player.setFlipX(true);
+                if (isOnGround && player.anims.currentAnim.key !== "run") {
+                    player.anims.play("run", true);
+                }
+            } 
+            else if (cursors.right.isDown) {
+                player.setVelocityX(200);
+                player.setFlipX(false);
+                if (isOnGround && player.anims.currentAnim.key !== "run") {
+                    player.anims.play("run", true);
+                }
+            } 
+            else if (isOnGround && !isMoving && player.anims.currentAnim.key !== "idle") {
+                player.anims.play("idle", true);
+            }
+
+            if (cursors.up.isDown && isOnGround) {
+                player.setVelocityY(-400);
+                player.anims.play("jump", true);
+            }
+
+            if (!isOnGround && player.anims.currentAnim.key !== "jump") {
+                player.anims.play("jump", true);
+            }
+        }
+    </script>
+</body>
+</html>
