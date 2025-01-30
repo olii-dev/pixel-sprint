@@ -16,56 +16,78 @@
             type: Phaser.AUTO,
             width: 800,
             height: 400,
-            physics: { default: "arcade", arcade: { gravity: { y: 600 }, debug: false } },
+            physics: { default: "arcade", arcade: { gravity: { y: 600 }, debug: true } },
             scene: { preload, create, update }
         };
 
-        let player, ground;
+        let player, ground, platforms, slimes;
         let cursors;
 
         const game = new Phaser.Game(config);
 
         function preload() {
             this.load.image("ground", "assets/sprites/ground.png");
-            this.load.spritesheet("player", "assets/sprites/player.png", {
-                frameWidth: 32,
-                frameHeight: 32
-            });
+            this.load.image("platform", "assets/sprites/platform.png");
+            this.load.spritesheet("slime", "assets/sprites/slime.png", { frameWidth: 32, frameHeight: 32 });
+            this.load.spritesheet("player", "assets/sprites/player.png", { frameWidth: 32, frameHeight: 32 });
         }
 
         function create() {
+            // Ground
             ground = this.physics.add.staticImage(400, 380, "ground").setScale(2).refreshBody();
+
+            // Platforms
+            platforms = this.physics.add.staticGroup();
+            platforms.create(300, 300, "platform");
+            platforms.create(500, 250, "platform");
+            platforms.create(700, 200, "platform");
+
+            // Slime group
+            slimes = this.physics.add.group();
+
+            let slime1 = slimes.create(400, 350, "slime");
+            let slime2 = slimes.create(600, 350, "slime");
+
+            slimes.children.iterate(slime => {
+                slime.setCollideWorldBounds(true);
+                slime.setVelocityX(-50); // Move left
+                slime.setImmovable(true); // So they don’t bounce
+                slime.setSize(25, 20); // Adjust hitbox
+                slime.setOffset(1, 12);
+            });
+
+            // Sprite
             player = this.physics.add.sprite(100, 300, "player").setScale(2);
-
             player.setCollideWorldBounds(true);
+            player.setSize(15, 28);
+            player.setOffset(9, 4);
+
+            // Collisions
             this.physics.add.collider(player, ground);
+            this.physics.add.collider(player, platforms);
+            this.physics.add.collider(slimes, ground);
+            this.physics.add.collider(slimes, platforms);
+            this.physics.add.collider(slimes, slimes, reverseSlimeDirection);
+            this.physics.add.collider(player, slimes, hitObstacle, null, this);
 
-            // IDLE animation
+            // Slime Animation
             this.anims.create({
-                key: "idle",
-                frames: this.anims.generateFrameNumbers("player", { start: 0, end: 4 }),
-                frameRate: 7,
+                key: "slime_move",
+                frames: this.anims.generateFrameNumbers("slime", { start: 0, end: 3 }),
+                frameRate: 5,
                 repeat: -1
             });
 
-            // RUN animation
-            this.anims.create({
-                key: "run",
-                frames: this.anims.generateFrameNumbers("player", { start: 5, end: 12 }),
-                frameRate: 10,
-                repeat: -1
+            slimes.children.iterate(slime => {
+                slime.play("slime_move");
             });
 
-            // JUMP animation
-            this.anims.create({
-                key: "jump",
-                frames: this.anims.generateFrameNumbers("player", { start: 13, end: 16 }),
-                frameRate: 8,
-                repeat: 0
-            });
+            // Player Animations
+            this.anims.create({ key: "idle", frames: this.anims.generateFrameNumbers("player", { start: 0, end: 4 }), frameRate: 7, repeat: -1 });
+            this.anims.create({ key: "run", frames: this.anims.generateFrameNumbers("player", { start: 5, end: 12 }), frameRate: 10, repeat: -1 });
+            this.anims.create({ key: "jump", frames: this.anims.generateFrameNumbers("player", { start: 13, end: 16 }), frameRate: 8, repeat: 0 });
 
             player.play("idle");
-
             cursors = this.input.keyboard.createCursorKeys();
         }
 
@@ -74,7 +96,7 @@
             let isMoving = cursors.left.isDown || cursors.right.isDown;
 
             player.setVelocityX(0);
-
+            
             if (cursors.left.isDown) {
                 player.setVelocityX(-200);
                 player.setFlipX(true);
@@ -101,6 +123,23 @@
             if (!isOnGround && player.anims.currentAnim.key !== "jump") {
                 player.anims.play("jump", true);
             }
+
+            // Slime movement logic
+            slimes.children.iterate(slime => {
+                if (slime.body.blocked.left || slime.body.blocked.right) {
+                    slime.setVelocityX(-slime.body.velocity.x); // Reverse direction
+                }
+            });
+        }
+
+        function reverseSlimeDirection(slime1, slime2) {
+            slime1.setVelocityX(-slime1.body.velocity.x);
+            slime2.setVelocityX(-slime2.body.velocity.x);
+        }
+
+        function hitObstacle(player, slime) {
+            player.setX(100);
+            player.setY(300);
         }
     </script>
 </body>
