@@ -16,79 +16,72 @@
             type: Phaser.AUTO,
             width: 800,
             height: 400,
-            physics: { default: "arcade", arcade: { gravity: { y: 600 }, debug: true } },
+            physics: { 
+                default: "arcade", 
+                arcade: { 
+                    gravity: { y: 600 }, 
+                    debug: false 
+                } 
+            },
             scene: { preload, create, update }
         };
 
-        let player, ground, platforms, slimes;
-        let cursors;
-
         const game = new Phaser.Game(config);
+        let player, lava, platforms;
+        let cursors;
+        let cameraSpeed = 0.1; // Adjust this value to control the scrolling speed
 
         function preload() {
-            this.load.image("ground", "assets/sprites/ground.png");
+            // Load lava texture - ensure this path points to a bright lava image
+            this.load.image("lava", "assets/sprites/lava.png"); 
             this.load.image("platform", "assets/sprites/platform.png");
-            this.load.spritesheet("slime", "assets/sprites/slime.png", { frameWidth: 32, frameHeight: 32 });
             this.load.spritesheet("player", "assets/sprites/player.png", { frameWidth: 32, frameHeight: 32 });
         }
 
         function create() {
-            // Ground
-            ground = this.physics.add.staticImage(400, 380, "ground").setScale(2).refreshBody();
+            // Create the long level layout
+            createLongLevel.call(this);
 
-            // Platforms
-            platforms = this.physics.add.staticGroup();
-            platforms.create(300, 300, "platform");
-            platforms.create(500, 250, "platform");
-            platforms.create(700, 200, "platform");
-
-            // Slime group
-            slimes = this.physics.add.group();
-
-            let slime1 = slimes.create(400, 350, "slime");
-            let slime2 = slimes.create(600, 350, "slime");
-
-            slimes.children.iterate(slime => {
-                slime.setCollideWorldBounds(true);
-                slime.setVelocityX(-50); // Move left
-                slime.setImmovable(true); // So they don’t bounce
-                slime.setSize(25, 20); // Adjust hitbox
-                slime.setOffset(1, 12);
-            });
+            // Create the lava as a large static image covering the entire width of the level
+            lava = this.physics.add.staticImage(0, 370, "lava").setScale(10, 4.5).setOrigin(0, 0); // Set height to 20 pixels
+            lava.body.setSize(8000, 50); // Set the body size to cover the entire level width
 
             // Sprite
-            player = this.physics.add.sprite(100, 300, "player").setScale(2);
-            player.setCollideWorldBounds(true);
+            player = this.physics.add.sprite(100, 300, "player").setScale(2); // Start on the platform
             player.setSize(15, 28);
             player.setOffset(9, 4);
 
             // Collisions
-            this.physics.add.collider(player, ground);
+            this.physics.add.collider(player, lava, hitLava, null, this); // Player collides with lava
             this.physics.add.collider(player, platforms);
-            this.physics.add.collider(slimes, ground);
-            this.physics.add.collider(slimes, platforms);
-            this.physics.add.collider(slimes, slimes, reverseSlimeDirection);
-            this.physics.add.collider(player, slimes, hitObstacle, null, this);
-
-            // Slime Animation
-            this.anims.create({
-                key: "slime_move",
-                frames: this.anims.generateFrameNumbers("slime", { start: 0, end: 3 }),
-                frameRate: 5,
-                repeat: -1
-            });
-
-            slimes.children.iterate(slime => {
-                slime.play("slime_move");
-            });
 
             // Player Animations
             this.anims.create({ key: "idle", frames: this.anims.generateFrameNumbers("player", { start: 0, end: 4 }), frameRate: 7, repeat: -1 });
-            this.anims.create({ key: "run", frames: this.anims.generateFrameNumbers("player", { start: 5, end: 12 }), frameRate: 10, repeat: -1 });
-            this.anims.create({ key: "jump", frames: this.anims.generateFrameNumbers("player", { start: 13, end: 16 }), frameRate: 8, repeat: 0 });
+            this.anims.create({ key: "run", frames: this.anims.generateFrameNumbers("player", { start: 8, end: 12 }), frameRate: 10, repeat: -1 });
+            this.anims.create({ key: "jump", frames: this.anims.generateFrameNumbers("player", { start: 15, end: 16 }), frameRate: 8, repeat: 0 });
 
             player.play("idle");
             cursors = this.input.keyboard.createCursorKeys();
+
+            // Set the world bounds
+            this.physics.world.setBounds(0, 0, 3000, 400); // Adjust width as needed for your level
+            this.cameras.main.setBounds(0, 0, 3000, 400); // Match camera bounds to world bounds
+        }
+
+        function createLongLevel() {
+            // Create platforms at various heights
+            platforms = this.physics.add.staticGroup();
+            platforms.create(100, 350, "platform").setScale(2, 1).refreshBody();
+            platforms.create(300, 300, "platform"); // Platform 1
+            platforms.create(500, 220, "platform") // Platform 2
+            platforms.create(700, 140, "platform"); // Platform 3
+            platforms.create(1050, 300, "platform").setScale(3, 2).refreshBody(); // Platform 4
+            platforms.create(1300, 220, "platform"); // Platform 5
+            platforms.create(1500, 140, "platform"); // Platform 6
+            platforms.create(1700, 300, "platform"); // Platform 7
+            platforms.create(2000, 220, "platform"); // Platform 8
+            platforms.create(2200, 140, "platform"); // Platform 9
+            platforms.create(2400, 300, "platform"); // Platform 10
         }
 
         function update() {
@@ -124,22 +117,20 @@
                 player.anims.play("jump", true);
             }
 
-            // Slime movement logic
-            slimes.children.iterate(slime => {
-                if (slime.body.blocked.left || slime.body.blocked.right) {
-                    slime.setVelocityX(-slime.body.velocity.x); // Reverse direction
-                }
-            });
+            // Prevent the player from going off the left edge of the screen
+            if (player.x < 0) {
+                player.x = 0; // Keep the player at the left edge
+            }
+
+            // Scroll the camera based on the player's position
+            this.cameras.main.scrollX += (player.x - this.cameras.main.scrollX - 400) * cameraSpeed;
         }
 
-        function reverseSlimeDirection(slime1, slime2) {
-            slime1.setVelocityX(-slime1.body.velocity.x);
-            slime2.setVelocityX(-slime2.body.velocity.x);
-        }
-
-        function hitObstacle(player, slime) {
-            player.setX(100);
-            player.setY(300);
+        function hitLava(player, lava) {
+            // Restart the level when the player hits the lava
+            player.setPosition(100, 300); // Reset player position
+            player.setVelocity(0); // Stop player movement
+            // Optionally, you can add a restart delay or a visual effect here
         }
     </script>
 </body>
